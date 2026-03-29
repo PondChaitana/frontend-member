@@ -158,6 +158,34 @@ import type {
  * Response: { access_token: string, refresh_token?: string, user: UserProfile }
  */
 export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
+  // --- 🛠️ MOCK LOGIN FOR FRONTEND DEV ---
+  // จำลองการ Login ส่งผ่านให้หน้านี้ทำงานได้โดยไม่ต้องรอ Backend
+  // เมื่อต่อ API จริง ให้ลบ Block นี้ออก แล้ว Uncomment โค้ดด้านล่าง
+  await new Promise(resolve => setTimeout(resolve, 800)); // จำลองดีเลย์เน็ต
+  const isAdmin = payload.email.toLowerCase().includes('admin');
+  
+  const mockData: LoginResponse = {
+    access_token: 'mock_jwt_token_12345',
+    refresh_token: 'mock_refresh_token_67890',
+    user: {
+      id: isAdmin ? 'mock-admin-99' : 'mock-user-01',
+      username: isAdmin ? 'Admin Tester' : 'Somchai NormalUser',
+      email: payload.email,
+      role: isAdmin ? 'admin' : 'user', 
+      is_active: true,
+      phone: '0812345678',
+    } as UserProfile
+  };
+  
+  setToken(mockData.access_token);
+  if (mockData.refresh_token) {
+    localStorage.setItem('refresh_token', mockData.refresh_token);
+  }
+  setUser(mockData.user);
+  return mockData;
+  // ----------------------------------------
+
+  /* => โค้ดของจริงสำหรับทีม Backend (Uncomment เมื่อจะเชื่อมต่อ)
   const data = await apiFetch<LoginResponse>('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -172,6 +200,7 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
   setUser(data.user);
   
   return data;
+  */
 }
 
 /**
@@ -219,9 +248,20 @@ export async function registerAuthor(formData: FormData): Promise<RegisterRespon
  * Response: UserProfile object
  */
 export async function getProfile(): Promise<UserProfile> {
+  // --- 🛠️ MOCK GET PROFILE FOR FRONTEND DEV ---
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const user = getUser();
+  if (user) {
+    return user as UserProfile;
+  }
+  throw new Error('Unauthorized');
+  // ----------------------------------------
+
+  /* => โค้ดของจริงสำหรับทีม Backend (Uncomment เมื่อจะเชื่อมต่อ)
   return apiFetch<UserProfile>('/api/profile', {
     method: 'GET',
   });
+  */
 }
 
 /**

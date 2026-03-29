@@ -33,8 +33,14 @@ export default function LoginPage() {
       // Body: { email: string, password: string }
       // Response: { access_token, refresh_token?, user }
       // ============================================
-      await loginUser({ email: form.email, password: form.password });
-      router.push('/profile');
+      const response = await loginUser({ email: form.email, password: form.password });
+      
+      // ถ้ายูสเซอร์มีตำแหน่งเป็น admin ให้กระโดดไปหน้า Dashboard อัตโนมัติ
+      if (response.user.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/profile');
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'เข้าสู่ระบบไม่สำเร็จ';
       setError(message);
