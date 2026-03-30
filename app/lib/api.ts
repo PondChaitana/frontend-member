@@ -157,52 +157,54 @@ import type {
  * Request Body: { email: string, password: string }
  * Response: { access_token: string, refresh_token?: string, user: UserProfile }
  */
-export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
+export async function loginUser(
+  payload: { username: string; password: string }
+): Promise<LoginResponse> {
+
   // --- 🛠️ MOCK LOGIN FOR FRONTEND DEV ---
-  // จำลองการ Login ส่งผ่านให้หน้านี้ทำงานได้โดยไม่ต้องรอ Backend
-  // เมื่อต่อ API จริง ให้ลบ Block นี้ออก แล้ว Uncomment โค้ดด้านล่าง
-  await new Promise(resolve => setTimeout(resolve, 800)); // จำลองดีเลย์เน็ต
-  const isAdmin = payload.email.toLowerCase().includes('admin');
-  
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  const isAdmin = payload.username.toLowerCase().includes('admin');
+
   const mockData: LoginResponse = {
     access_token: 'mock_jwt_token_12345',
     refresh_token: 'mock_refresh_token_67890',
     user: {
       id: isAdmin ? 'mock-admin-99' : 'mock-user-01',
-      username: isAdmin ? 'Admin Tester' : 'Somchai NormalUser',
-      email: payload.email,
-      role: isAdmin ? 'admin' : 'user', 
+      username: payload.username,
+      email: `${payload.username}@example.com`,
+      role: isAdmin ? 'admin' : 'user',
       is_active: true,
       phone: '0812345678',
-    } as UserProfile
+    } as UserProfile,
   };
-  
+
   setToken(mockData.access_token);
   if (mockData.refresh_token) {
     localStorage.setItem('refresh_token', mockData.refresh_token);
   }
   setUser(mockData.user);
+
   return mockData;
+
   // ----------------------------------------
 
-  /* => โค้ดของจริงสำหรับทีม Backend (Uncomment เมื่อจะเชื่อมต่อ)
+  /* ✅ ใช้ตอนต่อ backend จริง
   const data = await apiFetch<LoginResponse>('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify(payload),
     skipAuth: true,
   });
-  
-  // Store token and user data
+
   setToken(data.access_token);
   if (data.refresh_token) {
     localStorage.setItem('refresh_token', data.refresh_token);
   }
   setUser(data.user);
-  
+
   return data;
   */
 }
-
 /**
  * Register User
  * 
