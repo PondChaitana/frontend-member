@@ -211,11 +211,18 @@ export async function loginUser(payload: LoginPayload): Promise<LoginResponse> {
  * Response: { success: true, user_id: string | number }
  */
 export async function registerUser(payload: RegisterUserPayload): Promise<RegisterResponse> {
+  // --- 🛠️ MOCK REGISTER USER FOR FRONTEND DEV ---
+  await new Promise(resolve => setTimeout(resolve, 800));
+  return { success: true, user_id: 'mock-user-' + Date.now() };
+  // ----------------------------------------
+
+  /* => โค้ดของจริงสำหรับทีม Backend (Uncomment เมื่อจะเชื่อมต่อ)
   return apiFetch<RegisterResponse>('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify(payload),
     skipAuth: true,
   });
+  */
 }
 
 /**
@@ -233,11 +240,18 @@ export async function registerUser(payload: RegisterUserPayload): Promise<Regist
  * Response: { success: true, user_id: string | number }
  */
 export async function registerAuthor(formData: FormData): Promise<RegisterResponse> {
+  // --- 🛠️ MOCK REGISTER AUTHOR FOR FRONTEND DEV ---
+  await new Promise(resolve => setTimeout(resolve, 800));
+  return { success: true, user_id: 'mock-author-' + Date.now() };
+  // ----------------------------------------
+
+  /* => โค้ดของจริงสำหรับทีม Backend (Uncomment เมื่อจะเชื่อมต่อ)
   return apiFetch<RegisterResponse>('/api/auth/register-author', {
     method: 'POST',
     body: formData,
     skipAuth: true,
   });
+  */
 }
 
 /**
