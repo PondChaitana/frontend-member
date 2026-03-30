@@ -289,10 +289,36 @@ export async function getProfile(): Promise<UserProfile> {
 export async function updateProfile(
   payload: UpdateProfilePayload
 ): Promise<ApiSuccessResponse & { user: UserProfile }> {
+
+  // --- 🛠️ MOCK UPDATE PROFILE ---
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  const currentUser = getUser() as UserProfile | null;
+
+  if (!currentUser) {
+    throw new Error('Unauthorized');
+  }
+
+  const updatedUser: UserProfile = {
+    ...currentUser,
+    ...payload,
+  };
+
+  setUser(updatedUser);
+
+  return {
+    success: true,
+    user: updatedUser,
+  };
+
+  // ----------------------------------------
+
+  /* => ของจริง (ใช้ตอนมี backend)
   return apiFetch<ApiSuccessResponse & { user: UserProfile }>('/api/profile', {
     method: 'PUT',
     body: JSON.stringify(payload),
   });
+  */
 }
 
 /**
@@ -306,17 +332,35 @@ export async function updateProfile(
 export async function changePassword(
   payload: ChangePasswordPayload
 ): Promise<ChangePasswordResponse> {
+
+  // --- 🛠️ MOCK CHANGE PASSWORD ---
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  // เช็ค mock ง่ายๆ
+  if (payload.new_password !== payload.confirm_password) {
+    throw new Error('รหัสผ่านไม่ตรงกัน');
+  }
+
+  if (payload.new_password.length < 8) {
+    throw new Error('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
+  }
+
+  return { success: true };
+
+  // ----------------------------------------
+
+  /* => ของจริง (ใช้ตอนมี backend)
   const data = await apiFetch<ChangePasswordResponse>('/api/auth/change-password', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
-  
-  // If backend returns a new token, update stored token
+
   if (data.new_token) {
     setToken(data.new_token);
   }
-  
+
   return data;
+  */
 }
 
 /**
