@@ -13,7 +13,6 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Check if user is authenticated
     if (!isAuthenticated()) {
       router.push('/login');
       return;
@@ -21,17 +20,11 @@ export default function ProfilePage() {
 
     async function fetchProfile() {
       try {
-        // ============================================
-        // TODO [Backend]: GET /api/profile
-        // Headers: Authorization: Bearer <access_token>
-        // Response: UserProfile object
-        // ============================================
         const data = await getProfile();
         setProfile(data);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'ไม่สามารถโหลดข้อมูลโปรไฟล์ได้';
         setError(message);
-        // If unauthorized, redirect to login
         if (err instanceof Error && 'status' in err && (err as Error & { status: number }).status === 401) {
           router.push('/login');
         }
@@ -105,16 +98,12 @@ export default function ProfilePage() {
             className="text-sm text-[#94a3b8] hover:text-red-400 transition-colors flex items-center gap-1.5"
             id="logout-btn"
           >
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-            </svg>
             ออกจากระบบ
           </button>
         </div>
 
         {/* Profile Card */}
         <div className="glass-card p-8">
-          {/* Avatar & Name */}
           <div className="flex items-center gap-5 mb-8">
             <div className="avatar-placeholder">
               {profile?.username?.charAt(0).toUpperCase() || '?'}
@@ -127,8 +116,11 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Info Rows */}
           <div className="space-y-0">
+            <div className="info-row">
+              <span className="label">ชื่อเต็ม</span>
+              <span className="value">{profile?.fullname || '—'}</span>
+            </div>
             <div className="info-row">
               <span className="label">อีเมล</span>
               <span className="value">{profile?.email || '—'}</span>
@@ -143,52 +135,16 @@ export default function ProfilePage() {
                 <span className="value">{profile?.expertise || '—'}</span>
               </div>
             )}
-            {profile?.date_joined && (
-              <div className="info-row">
-                <span className="label">วันที่สมัคร</span>
-                <span className="value">
-                  {new Date(profile.date_joined).toLocaleDateString('th-TH', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </span>
-              </div>
-            )}
-            {profile?.last_login && (
-              <div className="info-row">
-                <span className="label">เข้าสู่ระบบล่าสุด</span>
-                <span className="value">
-                  {new Date(profile.last_login).toLocaleDateString('th-TH', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-            )}
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="mt-6 grid grid-cols-2 gap-4">
-          <Link href="/profile/edit" className="btn-primary text-center block" id="link-edit-profile">
-            <span className="flex items-center justify-center gap-2">
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-              </svg>
-              แก้ไขโปรไฟล์
-            </span>
+          <Link href="/profile/edit" className="btn-primary text-center block">
+            แก้ไขโปรไฟล์
           </Link>
-          <Link href="/profile/change-password" className="btn-secondary text-center block" id="link-change-password">
-            <span className="flex items-center justify-center gap-2">
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-              </svg>
-              เปลี่ยนรหัสผ่าน
-            </span>
+          <Link href="/profile/change-password" className="btn-secondary text-center block">
+            เปลี่ยนรหัสผ่าน
           </Link>
         </div>
       </div>

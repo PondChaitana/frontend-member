@@ -1,253 +1,181 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import Link from 'next/link';
-import { mockUsers } from '@/app/lib/mockData';
+import { useState, useEffect } from 'react';
+import { adminGetUsers, AdminUser } from '@/app/lib/api';
 import type { UserRole } from '@/app/types/user';
+import Link from 'next/link';
 
 const ITEMS_PER_PAGE = 8;
 
 export default function AdminUsersPage() {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Filter & search logic
-  const filteredUsers = useMemo(() => {
-    return mockUsers.filter((user) => {
-      const matchesSearch =
-        search === '' ||
-        user.username.toLowerCase().includes(search.toLowerCase()) ||
-        user.email.toLowerCase().includes(search.toLowerCase()) ||
-        user.phone.includes(search);
+  const loadUsers = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const query: Record<string, string> = { page: String(currentPage) };
+      if (search) query.fullname = search;
+      if (roleFilter !== 'all') query.role = roleFilter;
 
-      const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+      const data = await adminGetUsers(query);
 
-      const matchesStatus =
-        statusFilter === 'all' ||
-        (statusFilter === 'active' && user.is_active) ||
-        (statusFilter === 'inactive' && !user.is_active);
+      const usersArray: AdminUser[] = Array.isArray(data)
+        ? data.map(u => ({
+            ...u,
+            id: Number(u.userid),
+            is_active: u.is_active === true || u.is_active === 'True' || u.is_active === 'true',
+          }))
+        : [];
 
-      return matchesSearch && matchesRole && matchesStatus;
-    });
-  }, [search, roleFilter, statusFilter]);
+      const filtered =
+        statusFilter === 'all'
+          ? usersArray
+          : usersArray.filter(u => (statusFilter === 'active' ? u.is_active : !u.is_active));
 
-  const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
-  const paginatedUsers = filteredUsers.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
-  // Reset page when filters change
-  const handleSearchChange = (value: string) => {
-    setSearch(value);
-    setCurrentPage(1);
-  };
-
-  const handleRoleChange = (value: UserRole | 'all') => {
-    setRoleFilter(value);
-    setCurrentPage(1);
-  };
-
-  const handleStatusChange = (value: 'all' | 'active' | 'inactive') => {
-    setStatusFilter(value);
-    setCurrentPage(1);
-  };
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('th-TH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const getRoleBadgeClass = (role: UserRole) => {
-    switch (role) {
-      case 'admin': return 'badge badge-admin';
-      case 'author': return 'badge badge-author';
-      default: return 'badge badge-user';
+      setUsers(filtered);
+      setTotalCount(filtered.length);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'เกิดข้อผิดพลาด');
+      setUsers([]);
+      setTotalCount(0);
+    } finally {
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    loadUsers();
+  }, [search, roleFilter, statusFilter, currentPage]);
+
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+  const formatDate = (dateStr: string | null) =>
+    dateStr
+      ? new Date(dateStr).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })
+      : '-';
+
   return (
-    <div className="animate-fade-in">
-      {/* Page Title */}
-      <div className="page-title-section">
-        <h1 className="page-title" id="admin-users-title">ผู้ใช้ทั้งหมด</h1>
-        <p className="page-description">
-          จัดการผู้ใช้ทั้งหมดในระบบ — ค้นหา กรอง ดูรายละเอียด แก้ไข หรือลบ
-        </p>
+    <div className="animate-fade-in max-w-6xl mx-auto p-6">
+      <h1 className="text-2xl font-semibold text-white mb-6">ผู้ใช้ทั้งหมด</h1>
+
+      <div className="flex flex-wrap gap-3 mb-4">
+        <input
+          type="text"
+          placeholder="ค้นหา..."
+          value={search}
+          onChange={e => {
+            setSearch(e.target.value);
+            setCurrentPage(1);
+          }}
+          className="px-3 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:border-indigo-500 outline-none"
+        />
+        <select
+          value={roleFilter}
+          onChange={e => {
+            setRoleFilter(e.target.value as any);
+            setCurrentPage(1);
+          }}
+          className="px-3 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:border-indigo-500 outline-none"
+        >
+          <option value="all">ทั้งหมด</option>
+          <option value="user">User</option>
+          <option value="author">Author</option>
+          <option value="admin">Admin</option>
+        </select>
+        <select
+          value={statusFilter}
+          onChange={e => {
+            setStatusFilter(e.target.value as any);
+            setCurrentPage(1);
+          }}
+          className="px-3 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:border-indigo-500 outline-none"
+        >
+          <option value="all">ทั้งหมด</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
       </div>
 
-      {/* Toolbar: Search + Filters */}
-      <div className="table-toolbar">
-        <div className="table-toolbar-left">
-          <div className="search-input-wrapper">
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-            </svg>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="ค้นหาชื่อ, อีเมล, เบอร์โทร..."
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              id="users-search-input"
-            />
-          </div>
-
-          <select
-            className="filter-select"
-            value={roleFilter}
-            onChange={(e) => handleRoleChange(e.target.value as UserRole | 'all')}
-            id="users-role-filter"
-          >
-            <option value="all">ทุก Role</option>
-            <option value="user">User</option>
-            <option value="author">Author</option>
-            <option value="admin">Admin</option>
-          </select>
-
-          <select
-            className="filter-select"
-            value={statusFilter}
-            onChange={(e) => handleStatusChange(e.target.value as 'all' | 'active' | 'inactive')}
-            id="users-status-filter"
-          >
-            <option value="all">ทุกสถานะ</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-
-        <div style={{ fontSize: '0.8125rem', color: 'var(--muted)' }}>
-          พบ {filteredUsers.length} ผู้ใช้
-        </div>
-      </div>
-
-      {/* Users Table */}
-      <div className="data-table-wrapper">
-        <table className="data-table" id="users-data-table">
-          <thead>
-            <tr>
-              <th>ผู้ใช้</th>
-              <th>Role</th>
-              <th>เบอร์โทร</th>
-              <th>สถานะ</th>
-              <th>วันที่สมัคร</th>
-              <th>เข้าสู่ระบบล่าสุด</th>
-              <th style={{ textAlign: 'center' }}>จัดการ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedUsers.length === 0 ? (
+      {loading ? (
+        <div className="text-gray-400 py-10 text-center">กำลังโหลด...</div>
+      ) : error ? (
+        <div className="text-red-500 py-4 text-center">{error}</div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl shadow-lg bg-gray-900">
+          <table className="min-w-full text-left border-collapse">
+            <thead className="bg-gray-800 text-gray-400">
               <tr>
-                <td colSpan={7}>
-                  <div className="empty-state">
-                    <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.182 16.318A4.486 4.486 0 0012.016 15a4.486 4.486 0 00-3.198 1.318M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
-                    </svg>
-                    <p>ไม่พบผู้ใช้ที่ตรงกับเงื่อนไข</p>
-                  </div>
-                </td>
+                <th className="px-4 py-2">Username</th>
+                <th className="px-4 py-2">Email</th>
+                <th className="px-4 py-2">Phone</th>
+                <th className="px-4 py-2">Status</th>
+                <th className="px-4 py-2">วันที่สมัคร</th>
+                <th className="px-4 py-2">เข้าสู่ระบบล่าสุด</th>
+                <th className="px-4 py-2">จัดการ</th>
               </tr>
-            ) : (
-              paginatedUsers.map((user) => (
-                <tr key={user.id}>
-                  <td>
-                    <div className="user-cell">
-                      <div className="user-cell-avatar">
-                        {user.username.charAt(0)}
-                      </div>
-                      <div className="user-cell-info">
-                        <span className="user-cell-name">{user.username}</span>
-                        <span className="user-cell-email">{user.email}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={getRoleBadgeClass(user.role)}>
-                      {user.role}
-                    </span>
-                  </td>
-                  <td>{user.phone}</td>
-                  <td>
-                    <span style={{ display: 'flex', alignItems: 'center' }}>
-                      <span className={`status-dot ${user.is_active ? 'active' : 'inactive'}`} />
-                      {user.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td>{formatDate(user.date_joined)}</td>
-                  <td>{formatDate(user.last_login)}</td>
-                  <td>
-                    <div className="actions-cell" style={{ justifyContent: 'center' }}>
-                      <Link
-                        href={`/admin/users/${user.id}`}
-                        className="action-btn"
-                        title="ดูรายละเอียด"
-                      >
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      </Link>
-                      <Link
-                        href={`/admin/users/${user.id}/edit`}
-                        className="action-btn"
-                        title="แก้ไข"
-                      >
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
-                        </svg>
-                      </Link>
-                    </div>
+            </thead>
+            <tbody>
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-4 text-center text-gray-400">
+                    ไม่พบผู้ใช้ที่ตรงกับเงื่อนไข
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                users.map(user => (
+                  <tr
+                    key={user.id}
+                    className="border-b border-gray-700 hover:bg-gray-800 transition duration-200"
+                  >
+                    <td className="px-4 py-2 text-white">{user.username}</td>
+                    <td className="px-4 py-2 text-gray-300">{user.email}</td>
+                    <td className="px-4 py-2 text-gray-300">{user.phone || '-'}</td>
+                    <td className={`px-4 py-2 font-medium ${user.is_active ? 'text-green-400' : 'text-red-400'}`}>
+                      {user.is_active ? 'Active' : 'Inactive'}
+                    </td>
+                    <td className="px-4 py-2 text-gray-300">{formatDate(user.date_joined)}</td>
+                    <td className="px-4 py-2 text-gray-300">{formatDate(user.last_login)}</td>
+                    <td className="px-4 py-2">
+                      <Link
+                        href={`/admin/users/${user.id}`}
+                        className="inline-block px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition duration-200"
+                      >
+                        แก้ไข
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="pagination">
-            <div className="pagination-info">
-              แสดง {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
-              {Math.min(currentPage * ITEMS_PER_PAGE, filteredUsers.length)} จาก{' '}
-              {filteredUsers.length} รายการ
-            </div>
-            <div className="pagination-buttons">
-              <button
-                className="page-btn"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(currentPage - 1)}
-                id="pagination-prev"
-              >
-                ก่อนหน้า
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  className={`page-btn ${page === currentPage ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(page)}
-                >
-                  {page}
-                </button>
-              ))}
-              <button
-                className="page-btn"
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(currentPage + 1)}
-                id="pagination-next"
-              >
-                ถัดไป
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      {totalPages > 1 && (
+        <div className="mt-4 flex flex-wrap gap-2 justify-center">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+            <button
+              key={page}
+              disabled={page === currentPage}
+              onClick={() => setCurrentPage(page)}
+              className={`px-3 py-1 rounded-lg font-medium ${
+                page === currentPage ? 'bg-indigo-500 text-white' : 'bg-gray-800 text-gray-300 hover:bg-indigo-600'
+              } transition duration-200`}
+            >
+              {page}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

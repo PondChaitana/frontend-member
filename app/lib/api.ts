@@ -1,42 +1,22 @@
 // ============================================
-// API Helper — Backend Integration Layer
-// ============================================
-//
-// TODO [Backend Developer]:
-// 1. Set the backend URL in .env.local:
-//    NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
-//
-// 2. Implement CORS on your Django backend:
-//    pip install django-cors-headers
-//    Add 'corsheaders' to INSTALLED_APPS
-//    Add 'corsheaders.middleware.CorsMiddleware' to MIDDLEWARE
-//    Set CORS_ALLOWED_ORIGINS = ['http://localhost:3000']
-//
-// 3. All API endpoints should return JSON responses
-//    matching the types in app/types/user.ts
+// API Helper — Backend Integration Layer (Fixed + Safe)
 // ============================================
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, '') || 'http://localhost:8000';
 
 /**
- * Get stored JWT token from localStorage
+ * JWT token helpers
  */
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('access_token');
 }
 
-/**
- * Store JWT token to localStorage
- */
 export function setToken(token: string): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem('access_token', token);
 }
 
-/**
- * Remove JWT token (logout)
- */
 export function removeToken(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem('access_token');
@@ -45,55 +25,41 @@ export function removeToken(): void {
 }
 
 /**
- * Store user data to localStorage
+ * User helpers
  */
 export function setUser(user: object): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem('user', JSON.stringify(user));
 }
 
-/**
- * Get stored user data
- */
 export function getUser(): object | null {
   if (typeof window === 'undefined') return null;
   const user = localStorage.getItem('user');
   return user ? JSON.parse(user) : null;
 }
 
-/**
- * Check if user is authenticated
- */
 export function isAuthenticated(): boolean {
   return !!getToken();
 }
 
-// ============================================
-// API Fetch Helper
-// ============================================
-// Automatically adds Authorization header if token exists
-// Handles JSON parsing and error responses
-
+/**
+ * API Fetch Helper
+ */
 interface FetchOptions extends RequestInit {
   skipAuth?: boolean;
 }
 
-export async function apiFetch<T>(
-  endpoint: string,
-  options: FetchOptions = {}
-): Promise<T> {
+export async function apiFetch<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { skipAuth = false, headers: customHeaders, ...rest } = options;
-  
+
   const headers: Record<string, string> = {
     ...(customHeaders as Record<string, string> || {}),
   };
 
-  // Don't set Content-Type for FormData (browser sets it with boundary)
   if (!(rest.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 
-  // Auto-attach JWT token
   if (!skipAuth) {
     const token = getToken();
     if (token) {
@@ -101,26 +67,22 @@ export async function apiFetch<T>(
     }
   }
 
-  const url = `${BACKEND_URL}${endpoint}`;
+  const url = `${BACKEND_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
 
   const response = await fetch(url, {
     ...rest,
     headers,
   });
 
-  // Handle non-JSON responses
   const contentType = response.headers.get('content-type');
   if (!contentType?.includes('application/json')) {
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     return {} as T;
   }
 
   const data = await response.json();
 
   if (!response.ok) {
-    // Throw error with backend message for the UI to display
     const errorMessage = data.detail || data.message || 'Something went wrong';
     const error = new Error(errorMessage) as Error & { data: typeof data; status: number };
     error.data = data;
@@ -132,17 +94,10 @@ export async function apiFetch<T>(
 }
 
 // ============================================
-// API ENDPOINTS — Ready for Backend Integration
-// ============================================
-// Each function below calls one backend endpoint.
-// The TODO comments describe the expected API contract.
+// API Endpoints (Safe + Email Login)
 // ============================================
 
 import type {
-  LoginPayload,
-  LoginResponse,
-  RegisterUserPayload,
-  RegisterResponse,
   UserProfile,
   UpdateProfilePayload,
   ChangePasswordPayload,
@@ -150,233 +105,187 @@ import type {
   ApiSuccessResponse,
 } from '@/app/types/user';
 
-/**
- * Login
- * 
- * TODO [Backend]: POST /api/auth/login
- * Request Body: { email: string, password: string }
- * Response: { access_token: string, refresh_token?: string, user: UserProfile }
- */
-export async function loginUser(
-  payload: { username: string; password: string }
-): Promise<LoginResponse> {
+export interface LoginResponse {
+  access_token: string;
+  refresh_token?: string;
+  user: {
+    id: number;
+    email: string;
+    role: string;
+    fullname: string;
+  };
+}
 
-  // --- 🛠️ MOCK LOGIN FOR FRONTEND DEV ---
-  await new Promise(resolve => setTimeout(resolve, 800));
+export async function loginUser(payload: { email: string; password: string }): Promise<LoginResponse> {
+  const data = await apiFetch<{
+    access: string;
+    refresh?: string;
+    user?: {
+      id: number;
+      email: string;
+      role: string;
+      fullname: string;
+    };
+  }>('/api/login/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    skipAuth: true,
+  });
 
-  const isAdmin = payload.username.toLowerCase().includes('admin');
+  if (!data.user) {
+    throw new Error('Login failed: invalid credentials or user not returned');
+  }
 
-  const mockData: LoginResponse = {
-    access_token: 'mock_jwt_token_12345',
-    refresh_token: 'mock_refresh_token_67890',
-    user: {
-      id: isAdmin ? 'mock-admin-99' : 'mock-user-01',
-      username: payload.username,
-      email: `${payload.username}@example.com`,
-      role: isAdmin ? 'admin' : 'user',
-      is_active: true,
-      phone: '0812345678',
-    } as UserProfile,
+  const loginData: LoginResponse = {
+    access_token: data.access,
+    refresh_token: data.refresh,
+    user: data.user,
   };
 
-  setToken(mockData.access_token);
-  if (mockData.refresh_token) {
-    localStorage.setItem('refresh_token', mockData.refresh_token);
-  }
-  setUser(mockData.user);
+  setToken(loginData.access_token);
+  if (loginData.refresh_token) localStorage.setItem('refresh_token', loginData.refresh_token);
+  setUser(loginData.user);
 
-  return mockData;
-
-  // ----------------------------------------
-
-  /* ✅ ใช้ตอนต่อ backend จริง
-  const data = await apiFetch<LoginResponse>('/api/auth/login', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-    skipAuth: true,
-  });
-
-  setToken(data.access_token);
-  if (data.refresh_token) {
-    localStorage.setItem('refresh_token', data.refresh_token);
-  }
-  setUser(data.user);
-
-  return data;
-  */
-}
-/**
- * Register User
- * 
- * TODO [Backend]: POST /api/auth/register
- * Request Body: { username: string, email: string, phone: string, password: string }
- * Response: { success: true, user_id: string | number }
- */
-export async function registerUser(payload: RegisterUserPayload): Promise<RegisterResponse> {
-  // --- 🛠️ MOCK REGISTER USER FOR FRONTEND DEV ---
-  await new Promise(resolve => setTimeout(resolve, 800));
-  return { success: true, user_id: 'mock-user-' + Date.now() };
-  // ----------------------------------------
-
-  /* => โค้ดของจริงสำหรับทีม Backend (Uncomment เมื่อจะเชื่อมต่อ)
-  return apiFetch<RegisterResponse>('/api/auth/register', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-    skipAuth: true,
-  });
-  */
+  return loginData;
 }
 
-/**
- * Register Author
- * 
- * TODO [Backend]: POST /api/auth/register-author
- * Content-Type: multipart/form-data
- * Request Body (FormData):
- *   - username: string
- *   - email: string
- *   - phone: string
- *   - password: string
- *   - expertise: string
- *   - id_card: File (image)
- * Response: { success: true, user_id: string | number }
- */
-export async function registerAuthor(formData: FormData): Promise<RegisterResponse> {
-  // --- 🛠️ MOCK REGISTER AUTHOR FOR FRONTEND DEV ---
-  await new Promise(resolve => setTimeout(resolve, 800));
-  return { success: true, user_id: 'mock-author-' + Date.now() };
-  // ----------------------------------------
-
-  /* => โค้ดของจริงสำหรับทีม Backend (Uncomment เมื่อจะเชื่อมต่อ)
-  return apiFetch<RegisterResponse>('/api/auth/register-author', {
-    method: 'POST',
-    body: formData,
-    skipAuth: true,
-  });
-  */
-}
-
-/**
- * Get current user profile
- * 
- * TODO [Backend]: GET /api/profile
- * Headers: Authorization: Bearer <access_token>
- * Response: UserProfile object
- */
 export async function getProfile(): Promise<UserProfile> {
-  // --- 🛠️ MOCK GET PROFILE FOR FRONTEND DEV ---
-  await new Promise(resolve => setTimeout(resolve, 500));
-  const user = getUser();
-  if (user) {
-    return user as UserProfile;
-  }
-  throw new Error('Unauthorized');
-  // ----------------------------------------
-
-  /* => โค้ดของจริงสำหรับทีม Backend (Uncomment เมื่อจะเชื่อมต่อ)
   return apiFetch<UserProfile>('/api/profile', {
     method: 'GET',
   });
-  */
 }
 
-/**
- * Update user profile
- * 
- * TODO [Backend]: PUT /api/profile
- * Headers: Authorization: Bearer <access_token>
- * Request Body: { email?: string, phone?: string, expertise?: string }
- * Response: { success: true, user: UserProfile }
- */
-export async function updateProfile(
-  payload: UpdateProfilePayload
-): Promise<ApiSuccessResponse & { user: UserProfile }> {
-
-  // --- 🛠️ MOCK UPDATE PROFILE ---
-  await new Promise(resolve => setTimeout(resolve, 800));
-
-  const currentUser = getUser() as UserProfile | null;
-
-  if (!currentUser) {
-    throw new Error('Unauthorized');
-  }
-
-  const updatedUser: UserProfile = {
-    ...currentUser,
-    ...payload,
-  };
-
-  setUser(updatedUser);
-
-  return {
-    success: true,
-    user: updatedUser,
-  };
-
-  // ----------------------------------------
-
-  /* => ของจริง (ใช้ตอนมี backend)
-  return apiFetch<ApiSuccessResponse & { user: UserProfile }>('/api/profile', {
+export async function updateProfile(payload: UpdateProfilePayload): Promise<ApiSuccessResponse & { user: UserProfile }> {
+  const data = await apiFetch<ApiSuccessResponse & { user: UserProfile }>('/api/profile', {
     method: 'PUT',
     body: JSON.stringify(payload),
   });
-  */
+
+  if (data.user) setUser(data.user);
+  return data;
 }
 
-/**
- * Change password
- * 
- * TODO [Backend]: POST /api/auth/change-password
- * Headers: Authorization: Bearer <access_token>
- * Request Body: { current_password: string, new_password: string, confirm_password: string }
- * Response: { success: true, new_token?: string }
- */
-export async function changePassword(
-  payload: ChangePasswordPayload
-): Promise<ChangePasswordResponse> {
-
-  // --- 🛠️ MOCK CHANGE PASSWORD ---
-  await new Promise(resolve => setTimeout(resolve, 800));
-
-  // เช็ค mock ง่ายๆ
-  if (payload.new_password !== payload.confirm_password) {
-    throw new Error('รหัสผ่านไม่ตรงกัน');
-  }
-
-  if (payload.new_password.length < 8) {
-    throw new Error('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
-  }
-
-  return { success: true };
-
-  // ----------------------------------------
-
-  /* => ของจริง (ใช้ตอนมี backend)
-  const data = await apiFetch<ChangePasswordResponse>('/api/auth/change-password', {
+export async function changePassword(payload: { new_password: string }): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>('/api/reset-password/', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
-
-  if (data.new_token) {
-    setToken(data.new_token);
-  }
-
-  return data;
-  */
 }
 
-/**
- * Logout
- * 
- * TODO [Backend]: POST /api/auth/logout (optional)
- * Headers: Authorization: Bearer <access_token>
- * This is optional — frontend clears tokens regardless.
- */
 export async function logoutUser(): Promise<void> {
   try {
     await apiFetch('/api/auth/logout', { method: 'POST' });
   } catch {
-    // Logout endpoint is optional; clear local data anyway
+    // optional ignore
   }
   removeToken();
+}
+
+// ============================================
+// Register Endpoints
+// ============================================
+
+export interface RegisterPayload {
+  fullname: string;
+  username: string;
+  email: string;
+  phone?: string;
+  password: string;
+  role: 'user' | 'author';
+  idcard?: File;
+  expertise?: string;
+}
+
+// Register user (JSON)
+export async function registerUser(payload: RegisterPayload) {
+  return apiFetch('/api/register/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    skipAuth: true,
+  });
+}
+
+// Register author (FormData)
+export async function registerAuthor(formData: FormData) {
+  return apiFetch('/api/register/', {
+    method: 'POST',
+    body: formData,
+    skipAuth: true,
+  });
+}
+
+export interface AdminUser {
+  [x: string]: any;
+  id: number;
+  username: string;
+  email: string;
+  phone: string;
+  role: 'user' | 'author' | 'admin';
+  expertise?: string;
+  is_active: boolean;
+  date_joined: string;
+  last_login: string;
+}
+
+export interface AdminUsersResponse {
+  results: AdminUser[];
+  count: number;
+}
+
+export interface UpdateAdminUserPayload {
+  username?: string;
+  email?: string;
+  phone?: string;
+  role?: 'user' | 'author' | 'admin';
+  expertise?: string;
+  is_active?: boolean;
+}
+
+// List users (with optional search & role filter)
+export async function adminGetUsers(
+  query?: { role?: string; fullname?: string; page?: number }
+): Promise<AdminUsersResponse> {
+  const params = new URLSearchParams(query as Record<string, string>);
+  return apiFetch<AdminUsersResponse>(`/api/admin/users/?${params.toString()}`, {
+    method: 'GET',
+  });
+}
+
+// Get single user
+export async function adminGetUser(userId: number): Promise<AdminUser> {
+  console.log(`Fetching user with ID: ${userId}`);
+  return apiFetch<AdminUser>(`/api/admin/users/${userId}/`, {
+    method: 'GET',
+  });
+}
+
+// Update user (PATCH)
+export async function adminUpdateUser(
+  userId: number,
+  payload: Partial<AdminUser>
+): Promise<AdminUser> {
+  const token = getToken();
+  const res = await fetch(`${BACKEND_URL}/api/admin/users/${userId}/update/`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const msg = data.detail || data.message || 'Failed to update user';
+    throw new Error(msg);
+  }
+
+  return res.json();
+}
+
+// Delete user
+export async function adminDeleteUser(userId: number): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(`/api/admin/users/${userId}/delete/`, {
+    method: 'DELETE',
+  });
 }

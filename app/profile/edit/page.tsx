@@ -163,15 +163,15 @@ export default function EditProfilePage() {
 
             {/* Username (read-only) */}
             <div className="mb-4">
-              <label className="form-label">ชื่อผู้ใช้</label>
+              <label htmlFor="edit-username" className="form-label">ชื่อผู้ใช้</label>
               <input
+                id="edit-username"
                 type="text"
-                className="form-input opacity-50 cursor-not-allowed"
-                value={profile?.username || ''}
-                disabled
-                id="edit-username-readonly"
+                className="form-input bg-gray-700 text-gray-200 cursor-not-allowed opacity-70"
+                value={profile?.username || ''} 
+                disabled 
               />
-              <p className="text-xs text-[#64748b] mt-1">ชื่อผู้ใช้ไม่สามารถเปลี่ยนได้</p>
+              <p className="text-xs text-gray-400 mt-1">ชื่อผู้ใช้ไม่สามารถเปลี่ยนได้</p>
             </div>
 
             {/* Email */}

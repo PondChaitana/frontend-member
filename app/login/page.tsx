@@ -7,7 +7,7 @@ import { loginUser } from '@/app/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ username: '', password: '' }); // ✅ เปลี่ยน
+  const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -20,15 +20,15 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
 
-    if (!form.username || !form.password) {
-      setError('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
+    if (!form.email || !form.password) {
+      setError('กรุณากรอกอีเมลและรหัสผ่าน');
       return;
     }
 
     setLoading(true);
     try {
       const response = await loginUser({
-        username: form.username,
+        email: form.email,
         password: form.password,
       });
 
@@ -48,32 +48,27 @@ export default function LoginPage() {
   return (
     <div className="flex flex-1 items-center justify-center px-4 py-12">
       <div className="w-full max-w-md animate-fade-in">
-
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-white">เข้าสู่ระบบ</h1>
         </div>
 
         <div className="glass-card p-8">
           <form onSubmit={handleSubmit}>
-
             {error && <p className="error-text mb-4">{error}</p>}
 
-            {/* ✅ Username */}
             <div className="mb-5">
-              <label className="form-label">ชื่อผู้ใช้</label>
+              <label className="form-label">อีเมล</label>
               <input
-                name="username"
-                type="text"
+                name="email"
+                type="email"
                 className="form-input"
-                placeholder="username"
-                value={form.username}
+                placeholder="email"
+                value={form.email}
                 onChange={handleChange}
                 required
               />
             </div>
 
-            {/* Password */}
             <div className="mb-6">
               <label className="form-label">รหัสผ่าน</label>
               <input
